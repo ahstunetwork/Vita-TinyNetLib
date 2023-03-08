@@ -1,6 +1,9 @@
 # C++11 Muduo
 
-![流程图](./img/a.png)
++ 类设计UML图
+![流程图](./img/class_uml.png)
++ Reactor模式
+![Reactor模式](./img/structure.png)
 
 ## 开发环境
 
