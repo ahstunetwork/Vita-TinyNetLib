@@ -1,9 +1,4 @@
-//
-// Created by vitanmc on 2023/3/5.
-//
-
-#ifndef VITANETLIB_EVENTLOOPTHREADPOOL_H
-#define VITANETLIB_EVENTLOOPTHREADPOOL_H
+#pragma once
 
 #include <functional>
 #include <string>
@@ -12,49 +7,35 @@
 
 #include "noncopyable.h"
 
-namespace Vita {
+class EventLoop;
+class EventLoopThread;
 
-    class EventLoop;
+class EventLoopThreadPool : noncopyable
+{
+public:
+    using ThreadInitCallback = std::function<void(EventLoop *)>;
 
-    class EventLoopThread;
+    EventLoopThreadPool(EventLoop *baseLoop, const std::string &nameArg);
+    ~EventLoopThreadPool();
 
-    class EventLoopThreadPool : NonCopyable {
-    public:
-        //Ïß³Ì³õÊ¼»¯»Øµ÷£¬ÔÚEventLoopThreadÍ¬ÑùÒ²ÓĞËû
-        using ThreadInitCallback = std::function<void(EventLoop *)>;
+    void setThreadNum(int numThreads) { numThreads_ = numThreads; }
 
+    void start(const ThreadInitCallback &cb = ThreadInitCallback());
 
-        //¹¹Ôìº¯ÊıĞèÒªÒ»¸öbaseLoop
-        EventLoopThreadPool(EventLoop *baseLoop, const std::string &nameArg);
+    // å¦‚æœå·¥ä½œåœ¨å¤šçº¿ç¨‹ä¸­ï¼ŒbaseLoop_(mainLoop)ä¼šé»˜è®¤ä»¥è½®è¯¢çš„æ–¹å¼åˆ†é…Channelç»™subLoop
+    EventLoop *getNextLoop();
 
-        ~EventLoopThreadPool();
+    std::vector<EventLoop *> getAllLoops();
 
-        void setThreadNum(int numThreads) { numThreads_ = numThreads; }
+    bool started() const { return started_; }
+    const std::string name() const { return name_; }
 
-        void start(const ThreadInitCallback &cb = ThreadInitCallback());
-
-        // Èç¹û¹¤×÷ÔÚ¶àÏß³ÌÖĞ£¬baseLoop_(mainLoop)»áÄ¬ÈÏÒÔÂÖÑ¯µÄ·½Ê½·ÖÅäChannel¸øsubLoop
-        EventLoop *getNextLoop();
-
-        // ÒÔvector<EventLoop*>µÄĞÎÊ½·µ»ØËØÓĞµÄloop
-        std::vector<EventLoop *> getAllLoops();
-
-        bool started() const { return started_; }
-
-        const std::string name() const { return name_; }
-
-    private:
-        // ÓÃ»§Ê¹ÓÃmuduo´´½¨µÄloop Èç¹ûÏß³ÌÊıÎª1 ÄÇÖ±½ÓÊ¹ÓÃÓÃ»§´´½¨µÄloop ·ñÔò´´½¨¶àEventLoop
-        EventLoop *baseLoop_;
-        std::string name_;
-        bool started_;
-        int numThreads_;
-        int next_; // ÂÖÑ¯µÄÏÂ±ê
-        //ËûÉíÎª¹ÜÀíEventLoopThreadµÄÀà£¬³ÖÓĞËùÓĞµÄEventLoopThtreadÖ¸Õë
-        std::vector<std::unique_ptr<EventLoopThread>> threads_;
-        std::vector<EventLoop *> loops_;
-    };
-
-} // Vita
-
-#endif //VITANETLIB_EVENTLOOPTHREADPOOL_H
+private:
+    EventLoop *baseLoop_; // ç”¨æˆ·ä½¿ç”¨muduoåˆ›å»ºçš„loop å¦‚æœçº¿ç¨‹æ•°ä¸º1 é‚£ç›´æ¥ä½¿ç”¨ç”¨æˆ·åˆ›å»ºçš„loop å¦åˆ™åˆ›å»ºå¤šEventLoop
+    std::string name_;
+    bool started_;
+    int numThreads_;
+    int next_; // è½®è¯¢çš„ä¸‹æ ‡
+    std::vector<std::unique_ptr<EventLoopThread>> threads_;
+    std::vector<EventLoop *> loops_;
+};

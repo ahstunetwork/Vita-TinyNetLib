@@ -1,9 +1,4 @@
-//
-// Created by vitanmc on 2023/3/5.
-//
-
-#ifndef VITANETLIB_EVENTLOOPTHREAD_H
-#define VITANETLIB_EVENTLOOPTHREAD_H
+#pragma once
 
 #include <functional>
 #include <mutex>
@@ -13,38 +8,26 @@
 #include "noncopyable.h"
 #include "Thread.h"
 
-namespace Vita {
+class EventLoop;
 
+class EventLoopThread : noncopyable
+{
+public:
+    using ThreadInitCallback = std::function<void(EventLoop *)>;
 
-    class EventLoop;
+    EventLoopThread(const ThreadInitCallback &cb = ThreadInitCallback(),
+                    const std::string &name = std::string());
+    ~EventLoopThread();
 
-    class EventLoopThread : NonCopyable {
-    public:
+    EventLoop *startLoop();
 
+private:
+    void threadFunc();
 
-        //ÏÖ³¡³õÊ¼»¯µ÷ÓÃµÄ»Øµ÷º¯Êı£¬Î¨Ò»²ÎÊıÎª EventLoop *
-        using ThreadInitCallback = std::function<void(EventLoop *)>;
-
-        EventLoopThread(const ThreadInitCallback &cb = ThreadInitCallback(),
-                        const std::string &name = std::string());
-
-        ~EventLoopThread();
-
-        EventLoop *startLoop();
-
-    private:
-        void threadFunc();
-
-
-        // EventLoopThreadµÄ×÷ÓÃÊÇ°ó¶¨Ò»¸öEventLoopºÍÒ»¸öThread
-        EventLoop *loop_;
-        Thread thread_;
-        bool exiting_;
-        std::mutex mutex_;             // »¥³âËø
-        std::condition_variable cond_; // Ìõ¼ş±äÁ¿
-        ThreadInitCallback callback_;
-    };
-
-} // Vita
-
-#endif //VITANETLIB_EVENTLOOPTHREAD_H
+    EventLoop *loop_;
+    bool exiting_;
+    Thread thread_;
+    std::mutex mutex_;             // äº’æ–¥é”
+    std::condition_variable cond_; // æ¡ä»¶å˜é‡
+    ThreadInitCallback callback_;
+};

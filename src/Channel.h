@@ -1,126 +1,81 @@
-//
-// Created by vitanmc on 2023/3/5.
-//
+#pragma once
 
-#ifndef VITANETLIB_CHANNEL_H
-#define VITANETLIB_CHANNEL_H
-
-#include "NonCopyable.h"
-#include "Timestamp.h"
 #include <functional>
 #include <memory>
 
-namespace Vita {
+#include "noncopyable.h"
+#include "Timestamp.h"
 
-    class EventLoop;
+class EventLoop;
 
-    class Channel : NonCopyable {
-    public:
-        using EventCallback = std::function<void()>;    //ÆÕÍ¨ÊÂ¼ş»Øµ÷
-        using ReadEventCallback = std::function<void(Timestamp)>; //¶ÁÊÂ¼ş»Øµ÷
+/**
+ * ç†æ¸…æ¥š EventLoopã€Channelã€Pollerä¹‹é—´çš„å…³ç³»  Reactoræ¨¡å‹ä¸Šå¯¹åº”å¤šè·¯äº‹ä»¶åˆ†å‘å™¨
+ * Channelç†è§£ä¸ºé€šé“ å°è£…äº†sockfdå’Œå…¶æ„Ÿå…´è¶£çš„event å¦‚EPOLLINã€EPOLLOUTäº‹ä»¶ è¿˜ç»‘å®šäº†pollerè¿”å›çš„å…·ä½“äº‹ä»¶
+ **/
+class Channel : noncopyable
+{
+public:
+    using EventCallback = std::function<void()>; // muduoä»ä½¿ç”¨typedef
+    using ReadEventCallback = std::function<void(Timestamp)>;
 
-        Channel(EventLoop *loop, int fd);
+    Channel(EventLoop *loop, int fd);
+    ~Channel();
 
-        ~Channel();
+    // fdå¾—åˆ°Polleré€šçŸ¥ä»¥å å¤„ç†äº‹ä»¶ handleEventåœ¨EventLoop::loop()ä¸­è°ƒç”¨
+    void handleEvent(Timestamp receiveTime);
 
-        // µ±fd±»epoll_wait´¥·¢ÒÔºó£¬´¦ÀíÊÂ¼şÔÚhandleEventµ÷ÓÃ
-        void handleEvent(Timestamp receiveTime);
+    // è®¾ç½®å›è°ƒå‡½æ•°å¯¹è±¡
+    void setReadCallback(ReadEventCallback cb) { readCallback_ = std::move(cb); }
+    void setWriteCallback(EventCallback cb) { writeCallback_ = std::move(cb); }
+    void setCloseCallback(EventCallback cb) { closeCallback_ = std::move(cb); }
+    void setErrorCallback(EventCallback cb) { errorCallback_ = std::move(cb); }
 
-        void handleEventWithGuard(Timestamp receiveTime);
+    // é˜²æ­¢å½“channelè¢«æ‰‹åŠ¨removeæ‰ channelè¿˜åœ¨æ‰§è¡Œå›è°ƒæ“ä½œ
+    void tie(const std::shared_ptr<void> &);
 
+    int fd() const { return fd_; }
+    int events() const { return events_; }
+    void set_revents(int revt) { revents_ = revt; }
 
-        // ÉèÖÃÎÄ¼şÃèÊö·û¶ÔÓ¦ÊÂ¼şµÄ»Øµ÷º¯Êı
-        void setReadCallback(ReadEventCallback cb) { readCallback_ = std::move(cb); }
+    // è®¾ç½®fdç›¸åº”çš„äº‹ä»¶çŠ¶æ€ ç›¸å½“äºepoll_ctl add delete
+    void enableReading() { events_ |= kReadEvent; update(); }
+    void disableReading() { events_ &= ~kReadEvent; update(); }
+    void enableWriting() { events_ |= kWriteEvent; update(); }
+    void disableWriting() { events_ &= ~kWriteEvent; update(); }
+    void disableAll() { events_ = kNoneEvent; update(); }
 
-        void setWriteCallback(EventCallback cb) { writeCallback_ = std::move(cb); }
+    // è¿”å›fdå½“å‰çš„äº‹ä»¶çŠ¶æ€
+    bool isNoneEvent() const { return events_ == kNoneEvent; }
+    bool isWriting() const { return events_ & kWriteEvent; }
+    bool isReading() const { return events_ & kReadEvent; }
 
-        void setCloseCallback(EventCallback cb) { closeCallback_ = std::move(cb); }
+    int index() { return index_; }
+    void set_index(int idx) { index_ = idx; }
 
-        void setErrorCallback(EventCallback cb) { errorCallback_ = std::move(cb); }
+    // one loop per thread
+    EventLoop *ownerLoop() { return loop_; }
+    void remove();
+private:
 
+    void update();
+    void handleEventWithGuard(Timestamp receiveTime);
 
-        // ÉèÖÃfdÏàÓ¦µÄÊÂ¼ş×´Ì¬ Ïàµ±ÓÚepoll_ctl add delete
-        void enableReading() {
-            events_ |= kReadEvent;
-            update();
-        }
+    static const int kNoneEvent;
+    static const int kReadEvent;
+    static const int kWriteEvent;
 
-        void disableReading() {
-            events_ &= ~kReadEvent;
-            update();
-        }
+    EventLoop *loop_; // äº‹ä»¶å¾ªç¯
+    const int fd_;    // fdï¼ŒPollerç›‘å¬çš„å¯¹è±¡
+    int events_;      // æ³¨å†Œfdæ„Ÿå…´è¶£çš„äº‹ä»¶
+    int revents_;     // Pollerè¿”å›çš„å…·ä½“å‘ç”Ÿçš„äº‹ä»¶
+    int index_;
 
-        void enableWriting() {
-            events_ |= kWriteEvent;
-            update();
-        }
+    std::weak_ptr<void> tie_;
+    bool tied_;
 
-        void disableWriting() {
-            events_ &= ~kWriteEvent;
-            update();
-        }
-
-        void disableAll() {
-            events_ = kNoneEvent;
-            update();
-        }
-
-        // ·µ»Øfdµ±Ç°µÄÊÂ¼ş×´Ì¬
-        bool isNoneEvent() const { return events_ == kNoneEvent; }
-
-        bool isWriting() const { return events_ & kWriteEvent; }
-
-        bool isReading() const { return events_ & kReadEvent; }
-
-
-        int get_status() { return status_; }
-
-        void set_status(int idx) { status_ = idx; }
-
-
-
-        // ·ÀÖ¹µ±channel±»ÊÖ¶¯removeµô channel»¹ÔÚÖ´ĞĞ»Øµ÷²Ù×÷
-        void tie(const std::shared_ptr<void> &);
-
-        int get_fd() const { return fd_; }
-
-        int get_events() const { return events_; }
-
-        void set_revents(int revt) { revents_ = revt; }
-
-
-        // one loop per thread
-        EventLoop *ownerLoop() { return loop_; }
-
-        void remove();
-
-        void update();
-
-
-    private:
-
-        EventLoop *loop_;    //¸ÃchannelËùÔÚµÄloop
-        int fd_;   // Óëchannel°ó¶¨µÄ fd
-        int events_;  // fdËù¹ØĞÄµÄÊÂ¼ş
-        int revents_;  //epoll_wait´¥·¢Êµ¼Ê·¢ÏÖfdµÄÊÂ¼ş
-
-        int status_;   //µ±Ç°channelµÄ×´Ì¬
-
-
-        // Ò»Ğ©ÉèÖÃÓëfd×´Ì¬ÓĞ¹ØµÄ³£Á¿
-        static const int kNoneEvent;
-        static const int kReadEvent;
-        static const int kWriteEvent;
-
-        ReadEventCallback readCallback_;
-        EventCallback writeCallback_;
-        EventCallback closeCallback_;
-        EventCallback errorCallback_;
-
-        std::weak_ptr<void> tie_;
-        bool tied_;
-    };
-
-} // Vita
-
-#endif //VITANETLIB_CHANNEL_H
+    // å› ä¸ºchannelé€šé“é‡Œå¯è·çŸ¥fdæœ€ç»ˆå‘ç”Ÿçš„å…·ä½“çš„äº‹ä»¶eventsï¼Œæ‰€ä»¥å®ƒè´Ÿè´£è°ƒç”¨å…·ä½“äº‹ä»¶çš„å›è°ƒæ“ä½œ
+    ReadEventCallback readCallback_;
+    EventCallback writeCallback_;
+    EventCallback closeCallback_;
+    EventCallback errorCallback_;
+};

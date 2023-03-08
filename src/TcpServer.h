@@ -1,9 +1,8 @@
-//
-// Created by vitanmc on 2023/3/6.
-//
+#pragma once
 
-#ifndef VITANETLIB_TCPSERVER_H
-#define VITANETLIB_TCPSERVER_H
+/**
+ * ç”¨æˆ·ä½¿ç”¨muduoç¼–å†™æœåŠ¡å™¨ç¨‹åº
+ **/
 
 #include <functional>
 #include <string>
@@ -20,82 +19,59 @@
 #include "TcpConnection.h"
 #include "Buffer.h"
 
-namespace Vita {
+// å¯¹å¤–çš„æœåŠ¡å™¨ç¼–ç¨‹ä½¿ç”¨çš„ç±»
+class TcpServer
+{
+public:
+    using ThreadInitCallback = std::function<void(EventLoop *)>;
 
-/**
- * ÓÃ»§Ê¹ÓÃmuduo±àĞ´·şÎñÆ÷³ÌĞò
- **/
-
-
-    // ¶ÔÍâµÄ·şÎñÆ÷±à³ÌÊ¹ÓÃµÄÀà
-    class TcpServer {
-    public:
-        using ThreadInitCallback = std::function<void(EventLoop *)>;
-
-        enum Option {
-            kNoReusePort,
-            kReusePort,
-        };
-
-        //TcpServerµÄ¹¹Ôìº¯ÊıĞèÒªÒ»¸öEventLoop£¬Ò»¸öipµØÖ·½á¹¹
-        TcpServer(EventLoop *loop,
-                  const InetAddress &listenAddr,
-                  const std::string &nameArg,
-                  Option option = kNoReusePort);
-
-        ~TcpServer();
-
-        void setThreadInitCallback(const ThreadInitCallback &cb) { threadInitCallback_ = cb; }
-
-        void setConnectionCallback(const ConnectionCallback &cb) { connectionCallback_ = cb; }
-
-        void setMessageCallback(const MessageCallback &cb) { messageCallback_ = cb; }
-
-        void setWriteCompleteCallback(const WriteCompleteCallback &cb) { writeCompleteCallback_ = cb; }
-
-        // ÉèÖÃµ×²ãsubloopµÄ¸öÊı
-        void setThreadNum(int numThreads);
-
-        // ¿ªÆô·şÎñÆ÷¼àÌı
-        void start();
-
-    private:
-        //´´½¨Ò»¸öTcpConnection£¬²ÎÊıÎª
-        // 1. Acceptor·µ»ØµÄsockfd
-        // 2. ¶Ô·½µÄipµØÖ·½á¹¹
-        void newConnection(int sockfd, const InetAddress &peerAddr);
-
-        void removeConnection(const TcpConnectionPtr &conn);
-
-        void removeConnectionInLoop(const TcpConnectionPtr &conn);
-
-
-        // TcpServer³ÖÓĞÒ»¸ömap\name--TcpConnectionPtr
-        using ConnectionMap = std::unordered_map<std::string, TcpConnectionPtr>;
-
-        // Tcp³ÖÓĞÔ­Ê¼µÄbaseLoop
-        EventLoop *loop_;
-
-        const std::string ipPort_;
-        const std::string name_;
-
-        std::unique_ptr<Acceptor> acceptor_; // ÔËĞĞÔÚmainloop ÈÎÎñ¾ÍÊÇ¼àÌıĞÂÁ¬½ÓÊÂ¼ş
-
-        //³ÖÓĞËùÓĞµÄ EventLoopThread
-        std::shared_ptr<EventLoopThreadPool> threadPool_;
-
-        ThreadInitCallback threadInitCallback_; // loopÏß³Ì³õÊ¼»¯µÄ»Øµ÷
-        ConnectionCallback connectionCallback_;       //ÓĞĞÂÁ¬½ÓÊ±µÄ»Øµ÷
-        MessageCallback messageCallback_;             // ÓĞ¶ÁĞ´ÊÂ¼ş·¢ÉúÊ±µÄ»Øµ÷
-        WriteCompleteCallback writeCompleteCallback_; // ÏûÏ¢·¢ËÍÍê³ÉºóµÄ»Øµ÷
-
-
-        std::atomic_int started_;
-
-        int nextConnId_;
-        ConnectionMap connections_; // ±£´æËùÓĞµÄÁ¬½Ó
+    enum Option
+    {
+        kNoReusePort,
+        kReusePort,
     };
 
-} // Vita
+    TcpServer(EventLoop *loop,
+              const InetAddress &listenAddr,
+              const std::string &nameArg,
+              Option option = kNoReusePort);
+    ~TcpServer();
 
-#endif //VITANETLIB_TCPSERVER_H
+    void setThreadInitCallback(const ThreadInitCallback &cb) { threadInitCallback_ = cb; }
+    void setConnectionCallback(const ConnectionCallback &cb) { connectionCallback_ = cb; }
+    void setMessageCallback(const MessageCallback &cb) { messageCallback_ = cb; }
+    void setWriteCompleteCallback(const WriteCompleteCallback &cb) { writeCompleteCallback_ = cb; }
+
+    // è®¾ç½®åº•å±‚subloopçš„ä¸ªæ•°
+    void setThreadNum(int numThreads);
+
+    // å¼€å¯æœåŠ¡å™¨ç›‘å¬
+    void start();
+
+private:
+    void newConnection(int sockfd, const InetAddress &peerAddr);
+    void removeConnection(const TcpConnectionPtr &conn);
+    void removeConnectionInLoop(const TcpConnectionPtr &conn);
+
+    using ConnectionMap = std::unordered_map<std::string, TcpConnectionPtr>;
+
+    EventLoop *loop_; // baseloop ç”¨æˆ·è‡ªå®šä¹‰çš„loop
+
+    const std::string ipPort_;
+    const std::string name_;
+
+    std::unique_ptr<Acceptor> acceptor_; // è¿è¡Œåœ¨mainloop ä»»åŠ¡å°±æ˜¯ç›‘å¬æ–°è¿æ¥äº‹ä»¶
+
+    std::shared_ptr<EventLoopThreadPool> threadPool_; // one loop per thread
+
+    ConnectionCallback connectionCallback_;       //æœ‰æ–°è¿æ¥æ—¶çš„å›è°ƒ
+    MessageCallback messageCallback_;             // æœ‰è¯»å†™äº‹ä»¶å‘ç”Ÿæ—¶çš„å›è°ƒ
+    WriteCompleteCallback writeCompleteCallback_; // æ¶ˆæ¯å‘é€å®Œæˆåçš„å›è°ƒ
+
+    ThreadInitCallback threadInitCallback_; // loopçº¿ç¨‹åˆå§‹åŒ–çš„å›è°ƒ
+
+    std::atomic_int started_;
+
+    int nextConnId_;
+    ConnectionMap connections_; // ä¿å­˜æ‰€æœ‰çš„è¿æ¥
+};

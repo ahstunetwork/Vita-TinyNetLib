@@ -1,10 +1,4 @@
-//
-// Created by vitanmc on 2023/3/5.
-//
-
-#ifndef VITANETLIB_POLLER_H
-#define VITANETLIB_POLLER_H
-
+#pragma once
 
 #include <vector>
 #include <unordered_map>
@@ -12,45 +6,34 @@
 #include "noncopyable.h"
 #include "Timestamp.h"
 
-namespace Vita {
+class Channel;
+class EventLoop;
 
-    class Channel;
-    class EventLoop;
+// muduoåº“ä¸­å¤šè·¯äº‹ä»¶åˆ†å‘å™¨çš„æ ¸å¿ƒIOå¤ç”¨æ¨¡å—
+class Poller
+{
+public:
+    using ChannelList = std::vector<Channel *>;
 
-// muduo¿âÖĞ¶àÂ·ÊÂ¼ş·Ö·¢Æ÷µÄºËĞÄIO¸´ÓÃÄ£¿é
-    class Poller {
-    public:
-        using ChannelList = std::vector<Channel *>;
+    Poller(EventLoop *loop);
+    virtual ~Poller() = default;
 
-        // PollerµÄ¹¹Ôìº¯ÊıÖ»ĞèÒªÒ»¸öEventLoopÖ¸Õë£¬ÓÃÓÚ±êÊ¶PollerÔÚÄÄÒ»¸öloopÀïÃæ
-        Poller(EventLoop *loop);
+    // ç»™æ‰€æœ‰IOå¤ç”¨ä¿ç•™ç»Ÿä¸€çš„æ¥å£
+    virtual Timestamp poll(int timeoutMs, ChannelList *activeChannels) = 0;
+    virtual void updateChannel(Channel *channel) = 0;
+    virtual void removeChannel(Channel *channel) = 0;
 
-        virtual ~Poller() = default;
+    // åˆ¤æ–­å‚æ•°channelæ˜¯å¦åœ¨å½“å‰çš„Pollerå½“ä¸­
+    bool hasChannel(Channel *channel) const;
 
-        // ¸øËùÓĞIO¸´ÓÃ±£ÁôÍ³Ò»µÄ½Ó¿Ú£¬µ÷ÓÃpoller£¬»á°Ñepoll_waitµÄ½á¹û±£³ÖÔÚactiveChannelsÀïÃæ
-        virtual Timestamp poll(int timeoutMs, ChannelList *activeChannels) = 0;
+    // EventLoopå¯ä»¥é€šè¿‡è¯¥æ¥å£è·å–é»˜è®¤çš„IOå¤ç”¨çš„å…·ä½“å®ç°
+    static Poller *newDefaultPoller(EventLoop *loop);
 
-        //½«°ó¶¨ÁËfdµÄchannel·ÅÈëpollerÀïÃæ£¬±êÊ¶ÏÂÒ»ÂÖ¹ØÏµÄ³¸öfd
-        //Õâ¸öº¯ÊıÓĞË­¸ºÔğµ÷ÓÃ£¿ÊÇÓÉchannel->updata²Ù×÷
-        virtual void updateChannel(Channel *channel) = 0;
-        virtual void removeChannel(Channel *channel) = 0;
+protected:
+    // mapçš„key:sockfd value:sockfdæ‰€å±çš„channelé€šé“ç±»å‹
+    using ChannelMap = std::unordered_map<int, Channel *>;
+    ChannelMap channels_;
 
-        // ÅĞ¶Ï²ÎÊıchannelÊÇ·ñÔÚµ±Ç°µÄPollerµ±ÖĞ
-        bool hasChannel(Channel *channel) const;
-
-        // EventLoop¿ÉÒÔÍ¨¹ı¸Ã½Ó¿Ú»ñÈ¡Ä¬ÈÏµÄIO¸´ÓÃµÄ¾ßÌåÊµÏÖ
-        static Poller *newDefaultPoller(EventLoop *loop);
-
-    protected:
-        // mapµÄkey:sockfd value:sockfdËùÊôµÄchannelÍ¨µÀÀàĞÍ
-        using ChannelMap = std::unordered_map<int, Channel *>;
-        ChannelMap channels_;
-
-    private:
-        EventLoop *ownerLoop_; // ¶¨ÒåPollerËùÊôµÄÊÂ¼şÑ­»·EventLoop
-    };
-
-
-} // Vita
-
-#endif //VITANETLIB_POLLER_H
+private:
+    EventLoop *ownerLoop_; // å®šä¹‰Polleræ‰€å±çš„äº‹ä»¶å¾ªç¯EventLoop
+};

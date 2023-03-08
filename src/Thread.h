@@ -1,9 +1,4 @@
-//
-// Created by vitanmc on 2023/3/5.
-//
-
-#ifndef VITANETLIB_THREAD_H
-#define VITANETLIB_THREAD_H
+#pragma once
 
 #include <functional>
 #include <thread>
@@ -14,39 +9,31 @@
 
 #include "noncopyable.h"
 
-namespace Vita {
+class Thread : noncopyable
+{
+public:
+    using ThreadFunc = std::function<void()>;
 
+    explicit Thread(ThreadFunc, const std::string &name = std::string());
+    ~Thread();
 
-    class Thread : NonCopyable {
-    public:
+    void start();
+    void join();
 
-        //Ïß³Ìº¯Êı
-        using ThreadFunc = std::function<void()>;
-        explicit Thread(ThreadFunc, const std::string &name = std::string());
+    bool started() { return started_; }
+    pid_t tid() const { return tid_; }
+    const std::string &name() const { return name_; }
 
-        ~Thread();
+    static int numCreated() { return numCreated_; }
 
-        void start();
-        void join();
-        bool started() { return started_; }
+private:
+    void setDefaultName();
 
-        pid_t tid() const { return tid_; }
-        const std::string &name() const { return name_; }
-        static int numCreated() { return numCreated_; }
-
-    private:
-        void setDefaultName();
-        bool started_;
-        bool joined_;
-
-        //³ÖÓĞÒ»¸ö±ê×¼¿âÏß³ÌµÄÖ¸Õë
-        std::shared_ptr<std::thread> thread_;
-        pid_t tid_;       // ÔÚÏß³Ì´´½¨Ê±ÔÙ°ó¶¨
-        ThreadFunc func_; // Ïß³Ì»Øµ÷º¯Êı
-        std::string name_;// Ïß³ÌÃû×Ö
-        static std::atomic_int numCreated_;   //ÎªÁËÏß³ÌµÄÄ¬ÈÏÃû×Ö£ºThread 1
-    };
-
-} // Vita
-
-#endif //VITANETLIB_THREAD_H
+    bool started_;
+    bool joined_;
+    std::shared_ptr<std::thread> thread_;
+    pid_t tid_;       // åœ¨çº¿ç¨‹åˆ›å»ºæ—¶å†ç»‘å®š
+    ThreadFunc func_; // çº¿ç¨‹å›è°ƒå‡½æ•°
+    std::string name_;
+    static std::atomic_int numCreated_;
+};

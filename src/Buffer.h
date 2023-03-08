@@ -1,140 +1,107 @@
-//
-// Created by vitanmc on 2023/3/6.
-//
-
-#ifndef VITANETLIB_BUFFER_H
-#define VITANETLIB_BUFFER_H
+#pragma once
 
 #include <vector>
 #include <string>
 #include <algorithm>
 #include <stddef.h>
 
-namespace Vita {
+// ç½‘ç»œåº“åº•å±‚çš„ç¼“å†²åŒºç±»å‹å®šä¹‰
+class Buffer
+{
+public:
+    static const size_t kCheapPrepend = 8;
+    static const size_t kInitialSize = 1024;
 
-// ÍøÂç¿âµ×²ãµÄ»º³åÇøÀàĞÍ¶¨Òå
-    class Buffer {
-    public:
-        // ·ÀÕ³°üµÄÔ¤ÁôÍ·²¿¿Õ¼ä
-        static const size_t kCheapPrepend = 8;
-        static const size_t kInitialSize = 1024;
+    explicit Buffer(size_t initalSize = kInitialSize)
+        : buffer_(kCheapPrepend + initalSize)
+        , readerIndex_(kCheapPrepend)
+        , writerIndex_(kCheapPrepend)
+    {
+    }
 
+    size_t readableBytes() const { return writerIndex_ - readerIndex_; }
+    size_t writableBytes() const { return buffer_.size() - writerIndex_; }
+    size_t prependableBytes() const { return readerIndex_; }
 
-        // bufferµÄ¹¹Ôìº¯Êı£¬Ö»ĞèÒª´«Èë³õÊ¼»¯Êı¾İÇø´óĞ¡
-        // 1. kCheapPrepend = kCheapPrepend + initialSize
-        // 2. readerIndex = kCheapPrepend
-        // 3. writeIndex = kCheapPrepend
-        // ¼´³õÊ¼»¯µÄÊ±ºò¶ÁºÍĞ´µÄÏÂ±ê¶¼ÔÚkCheapPrepend
-        explicit Buffer(size_t initialSize = kInitialSize)
-                : buffer_(kCheapPrepend + initialSize), readerIndex_(kCheapPrepend), writerIndex_(kCheapPrepend) {
+    // è¿”å›ç¼“å†²åŒºä¸­å¯è¯»æ•°æ®çš„èµ·å§‹åœ°å€
+    const char *peek() const { return begin() + readerIndex_; }
+    void retrieve(size_t len)
+    {
+        if (len < readableBytes())
+        {
+            readerIndex_ += len; // è¯´æ˜åº”ç”¨åªè¯»å–äº†å¯è¯»ç¼“å†²åŒºæ•°æ®çš„ä¸€éƒ¨åˆ†ï¼Œå°±æ˜¯lené•¿åº¦ è¿˜å‰©ä¸‹readerIndex+=lenåˆ°writerIndex_çš„æ•°æ®æœªè¯»
         }
-
-
-        // ·µ»Ø¿É¶Á¡¢¿ÉĞ´¡¢Ô¤Áô¿Õ¼äµÄ´óĞ¡
-        size_t readableBytes() const { return writerIndex_ - readerIndex_; }
-
-        size_t writableBytes() const { return buffer_.size() - writerIndex_; }
-
-        size_t prependableBytes() const { return readerIndex_; }
-
-        // ·µ»Ø»º³åÇøÖĞ¿É¶ÁÊı¾İµÄÆğÊ¼µØÖ·
-        // ·µ»ØµÄÊÇµü´úÆ÷£¬ÀûÓÃµÄÊÇvectorµÄÊÇËæ»ú¶ÁĞ´ÌØÕ÷
-        const char *peek() const { return begin() + readerIndex_; }
-
-
-        // µ÷ÓÃ´Ëº¯Êı¼ìË÷Ò»ÏÂ£¬¿´µ±´Î¶ÁÈ¡µÄÊı¾İ³¤¶ÈÓĞÃ»ÓĞ°Ñ¿É¶ÁÊı¾İÇø¶ÁÍê
-        // ÈôÊÇÃ»¶ÁÍê£¬¼´ len < readableBytes -- ĞŞ¸ÄreaderIndexÏÂ±ê
-        // ÈôÊÇ¶ÁÍêÁË -- readerIndex, writerIndexÈ«²¿¸´Î»£¬»Øµ½kCheapPrepend
-        void retrieve(size_t len) {
-            if (len < readableBytes()) {
-                readerIndex_ += len;
-            } else // len == readableBytes()
-            {
-                retrieveAll();
-            }
+        else // len == readableBytes()
+        {
+            retrieveAll();
         }
+    }
+    void retrieveAll()
+    {
+        readerIndex_ = kCheapPrepend;
+        writerIndex_ = kCheapPrepend;
+    }
 
-        void retrieveAll() {
+    // æŠŠonMessageå‡½æ•°ä¸ŠæŠ¥çš„Bufferæ•°æ® è½¬æˆstringç±»å‹çš„æ•°æ®è¿”å›
+    std::string retrieveAllAsString() { return retrieveAsString(readableBytes()); }
+    std::string retrieveAsString(size_t len)
+    {
+        std::string result(peek(), len);
+        retrieve(len); // ä¸Šé¢ä¸€å¥æŠŠç¼“å†²åŒºä¸­å¯è¯»çš„æ•°æ®å·²ç»è¯»å–å‡ºæ¥ è¿™é‡Œè‚¯å®šè¦å¯¹ç¼“å†²åŒºè¿›è¡Œå¤ä½æ“ä½œ
+        return result;
+    }
+
+    // buffer_.size - writerIndex_
+    void ensureWritableBytes(size_t len)
+    {
+        if (writableBytes() < len)
+        {
+            makeSpace(len); // æ‰©å®¹
+        }
+    }
+
+    // æŠŠ[data, data+len]å†…å­˜ä¸Šçš„æ•°æ®æ·»åŠ åˆ°writableç¼“å†²åŒºå½“ä¸­
+    void append(const char *data, size_t len)
+    {
+        ensureWritableBytes(len);
+        std::copy(data, data+len, beginWrite());
+        writerIndex_ += len;
+    }
+    char *beginWrite() { return begin() + writerIndex_; }
+    const char *beginWrite() const { return begin() + writerIndex_; }
+
+    // ä»fdä¸Šè¯»å–æ•°æ®
+    ssize_t readFd(int fd, int *saveErrno);
+    // é€šè¿‡fdå‘é€æ•°æ®
+    ssize_t writeFd(int fd, int *saveErrno);
+
+private:
+    // vectoråº•å±‚æ•°ç»„é¦–å…ƒç´ çš„åœ°å€ ä¹Ÿå°±æ˜¯æ•°ç»„çš„èµ·å§‹åœ°å€
+    char *begin() { return &*buffer_.begin(); }
+    const char *begin() const { return &*buffer_.begin(); }
+
+    void makeSpace(size_t len)
+    {
+        /**
+         * | kCheapPrepend |xxx| reader | writer |                     // xxxæ ‡ç¤ºreaderä¸­å·²è¯»çš„éƒ¨åˆ†
+         * | kCheapPrepend | reader ï½œ          len          |
+         **/
+        if (writableBytes() + prependableBytes() < len + kCheapPrepend) // ä¹Ÿå°±æ˜¯è¯´ len > xxx + writerçš„éƒ¨åˆ†
+        {
+            buffer_.resize(writerIndex_ + len);
+        }
+        else // è¿™é‡Œè¯´æ˜ len <= xxx + writer æŠŠreaderæ¬åˆ°ä»xxxå¼€å§‹ ä½¿å¾—xxxåé¢æ˜¯ä¸€æ®µè¿ç»­ç©ºé—´
+        {
+            size_t readable = readableBytes(); // readable = readerçš„é•¿åº¦
+            std::copy(begin() + readerIndex_,
+                      begin() + writerIndex_,  // æŠŠè¿™ä¸€éƒ¨åˆ†æ•°æ®æ‹·è´åˆ°begin+kCheapPrependèµ·å§‹å¤„
+                      begin() + kCheapPrepend);
             readerIndex_ = kCheapPrepend;
-            writerIndex_ = kCheapPrepend;
+            writerIndex_ = readerIndex_ + readable;
         }
+    }
 
-        // °ÑonMessageº¯ÊıÉÏ±¨µÄBufferÊı¾İ ×ª³ÉstringÀàĞÍµÄÊı¾İ·µ»Ø
-        // ÕıÈçº¯ÊıÃû×ÖÀïµÄALL -- ¸Ãº¯Êı»á°Ñ¿É¶ÁÇøÓòÄÚµÄËùÓĞÊı¾İ£¬¶Á³Éstring·µ»Ø
-        std::string retrieveAllAsString() { return retrieveAsString(readableBytes()); }
-
-        std::string retrieveAsString(size_t len) {
-            std::string result(peek(), len);
-            retrieve(len); // ÉÏÃæÒ»¾ä°Ñ»º³åÇøÖĞ¿É¶ÁµÄÊı¾İÒÑ¾­¶ÁÈ¡³öÀ´ ÕâÀï¿Ï¶¨Òª¶Ô»º³åÇø½øĞĞ¸´Î»²Ù×÷
-            return result;
-        }
-
-        // buffer_.size - writerIndex_
-        // ¸Ãº¯ÊıÍê³ÉµÄÄ¿±êÒªÈ·±£Ä³Ò»´ÎĞ´²Ù×÷³É¹¦£¬ĞèÒªensureWritableBytes¿ª±Ù×ã¹»¿Õ¼ä
-        // Èç¹û¿É¶Á¿Õ¼ä writableBytes < len -- makeSpace
-        void ensureWritableBytes(size_t len) {
-            if (writableBytes() < len) {
-                makeSpace(len); // À©Èİ
-            }
-        }
-        void makeSpace(size_t len) {
-            /**
-             * | kCheapPrepend |xxx| reader | writer |                     // xxx±êÊ¾readerÖĞÒÑ¶ÁµÄ²¿·Ö
-             * | kCheapPrepend | reader £ü          len          |
-             **/
-
-
-            // Ò²¾ÍÊÇËµ len > xxx + writerµÄ²¿·Ö
-            // ½øµ½Õâ¸öº¯ÊıÀï£¬¿Ï¶¨ÊÇÓÉÓÚĞ´Çø²»¹»ÁË£¬ÄÇÃ´ÔõÃ´À©´ó¿Õ¼äÄØ£¿
-            // Èô±»prependingÕ¼¾İÁËºÜ¶à¿Õ¼ä£¬ÄÇÃ´¿ÉÒÔÖ±½ÓÍùÇ°Å²
-            // Èôprepending¿Õ¼äÒ²ÎŞ¼ÃÓÚÊÂ£¬Ö»ÄÜ¿ª´óÕĞ -- Ö±½Óresize
-            if (writableBytes() + prependableBytes() - kCheapPrepend < len)
-            {
-                buffer_.resize(writerIndex_ + len);
-            } else // ÕâÀïËµÃ÷ len <= xxx + writer °Ñreader°áµ½´Óxxx¿ªÊ¼ Ê¹µÃxxxºóÃæÊÇÒ»¶ÎÁ¬Ğø¿Õ¼ä
-            {
-                size_t readable = readableBytes(); // readable = readerµÄ³¤¶È
-                // copyº¯Êı£¬°ÑreaderIndexµ½writeIndexÕâÒ»²¿·ÖÊı¾İ¶Áµ½kCheapPrepending
-                std::copy(begin() + readerIndex_,
-                          begin() + writerIndex_,
-                          begin() + kCheapPrepend);
-                readerIndex_ = kCheapPrepend;
-                writerIndex_ = readerIndex_ + readable;
-            }
-        }
-
-        // °Ñ[data, data+len]ÄÚ´æÉÏµÄÊı¾İÌí¼Óµ½writable»º³åÇøµ±ÖĞ
-        // appendµ÷ÓÃµÄµØ·½Îª£º´ÓfdÉÏ¶ÁÊı¾İµÄÊ±ºò£¬buffer¿Õ¼äÒ»Ê±°ë»á²»¹»£¬ÏÈ¶Áµ½extrabufÀïÃæ
-        // ÏÈ°Ñ»îÀ¿ÏÂÀ´£¬È»ºóºóÃæbufferÀ©Èİ£¬extrabufÊı¾İappendµ½bufferÀïÃæ
-        void append(const char *data, size_t len) {
-            ensureWritableBytes(len);
-            std::copy(data, data + len, beginWrite());
-            writerIndex_ += len;
-        }
-
-        char *beginWrite() { return begin() + writerIndex_; }
-
-        const char *beginWrite() const { return begin() + writerIndex_; }
-
-        // ´ÓfdÉÏ¶ÁÈ¡Êı¾İ
-        ssize_t readFd(int fd, int *saveErrno);
-
-        // Í¨¹ıfd·¢ËÍÊı¾İ
-        ssize_t writeFd(int fd, int *saveErrno);
-
-    private:
-        // vectorµ×²ãÊı×éÊ×ÔªËØµÄµØÖ· Ò²¾ÍÊÇÊı×éµÄÆğÊ¼µØÖ·
-//        char *begin() { return &*buffer_.begin(); }
-        char *begin() { return buffer_.data(); }
-        const char *begin() const { return buffer_.data(); }
-
-
-        std::vector<char> buffer_;
-        size_t readerIndex_;
-        size_t writerIndex_;
-    };
-
-
-} // Vita
-
-#endif //VITANETLIB_BUFFER_H
+    std::vector<char> buffer_;
+    size_t readerIndex_;
+    size_t writerIndex_;
+};

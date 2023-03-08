@@ -1,9 +1,4 @@
-//
-// Created by vitanmc on 2023/3/5.
-//
-
-#ifndef VITANETLIB_EPOLLPOLLER_H
-#define VITANETLIB_EPOLLPOLLER_H
+#pragma once
 
 #include <vector>
 #include <sys/epoll.h>
@@ -11,43 +6,36 @@
 #include "Poller.h"
 #include "Timestamp.h"
 
-namespace Vita {
-
-
 /**
- * epollµÄÊ¹ÓÃ:
+ * epollçš„ä½¿ç”¨:
  * 1. epoll_create
  * 2. epoll_ctl (add, mod, del)
  * 3. epoll_wait
  **/
 
-    class Channel;
+class Channel;
 
-    class EPollPoller : public Poller {
-    public:
-        //EPollPollerºÍpollerÒ»Ñù£¬¹¹Ôìº¯ÊıÖ»ĞèÒªÒ»¸öEventLoop
-        EPollPoller(EventLoop *loop);
-        ~EPollPoller() override;
+class EPollPoller : public Poller
+{
+public:
+    EPollPoller(EventLoop *loop);
+    ~EPollPoller() override;
 
-        // ÖØĞ´»ùÀàPollerµÄ³éÏó·½·¨
-        Timestamp poll(int timeoutMs, ChannelList *activeChannels) override;
-        void updateChannel(Channel *channel) override;
-        void removeChannel(Channel *channel) override;
-        // ÌîĞ´»îÔ¾µÄÁ¬½Ó
-        void fillActiveChannels(int numEvents, ChannelList *activeChannels) const;
+    // é‡å†™åŸºç±»Pollerçš„æŠ½è±¡æ–¹æ³•
+    Timestamp poll(int timeoutMs, ChannelList *activeChannels) override;
+    void updateChannel(Channel *channel) override;
+    void removeChannel(Channel *channel) override;
 
-        // ¸üĞÂchannelÍ¨µÀ ÆäÊµ¾ÍÊÇµ÷ÓÃepoll_ctl
-        void update(int operation, Channel *channel);
+private:
+    static const int kInitEventListSize = 16;
 
-    private:
-        //fillEventListSizeÎªepoll_wait´«³öµÄÊı×é£¬ÓÉÓÚÎÒÃÇÊ¹ÓÃvectorÀ´×øµÄ£¬
-        // ËùÒÔĞèÒªÒ»¸ö³õÊ¼´óĞ¡£¬À´resize
-        static const int kInitEventListSize = 16;
-        using EventList = std::vector<epoll_event>; // C++ÖĞ¿ÉÒÔÊ¡ÂÔstruct Ö±½ÓĞ´epoll_event¼´¿É
-        int epollfd_;      // epoll_create´´½¨·µ»ØµÄfd±£´æÔÚepollfd_ÖĞ
-        EventList events_; // ÓÃÓÚ´æ·Åepoll_wait·µ»ØµÄËùÓĞ·¢ÉúµÄÊÂ¼şµÄÎÄ¼şÃèÊö·ûÊÂ¼ş¼¯
-    };
+    // å¡«å†™æ´»è·ƒçš„è¿æ¥
+    void fillActiveChannels(int numEvents, ChannelList *activeChannels) const;
+    // æ›´æ–°channelé€šé“ å…¶å®å°±æ˜¯è°ƒç”¨epoll_ctl
+    void update(int operation, Channel *channel);
 
-} // Vita
+    using EventList = std::vector<epoll_event>; // C++ä¸­å¯ä»¥çœç•¥struct ç›´æ¥å†™epoll_eventå³å¯
 
-#endif //VITANETLIB_EPOLLPOLLER_H
+    int epollfd_;      // epoll_createåˆ›å»ºè¿”å›çš„fdä¿å­˜åœ¨epollfd_ä¸­
+    EventList events_; // ç”¨äºå­˜æ”¾epoll_waitè¿”å›çš„æ‰€æœ‰å‘ç”Ÿçš„äº‹ä»¶çš„æ–‡ä»¶æè¿°ç¬¦äº‹ä»¶é›†
+};

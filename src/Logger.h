@@ -1,15 +1,8 @@
-//
-// Created by vitanmc on 2023/3/5.
-//
-
-#ifndef VITANETLIB_LOGGER_H
-#define VITANETLIB_LOGGER_H
+#pragma once
 
 #include <string>
 
 #include "noncopyable.h"
-
-namespace Vita {
 
 // LOG_INFO("%s %d", arg1, arg2)
 #define LOG_INFO(logmsgFormat, ...)                       \
@@ -44,7 +37,7 @@ namespace Vita {
     } while (0)
 
 #ifdef MUDEBUG
-    #define LOG_DEBUG(logmsgFormat, ...)                      \
+#define LOG_DEBUG(logmsgFormat, ...)                      \
     do                                                    \
     {                                                     \
         Logger &logger = Logger::instance();              \
@@ -57,31 +50,27 @@ namespace Vita {
 #define LOG_DEBUG(logmsgFormat, ...)
 #endif
 
-// ¶¨ÒåÈÕÖ¾µÄ¼¶±ğ INFO ERROR FATAL DEBUG
-    enum LogLevel
-    {
-        INFO,  // ÆÕÍ¨ĞÅÏ¢
-        ERROR, // ´íÎóĞÅÏ¢
-        FATAL, // core dumpĞÅÏ¢
-        DEBUG, // µ÷ÊÔĞÅÏ¢
-    };
+// å®šä¹‰æ—¥å¿—çš„çº§åˆ« INFO ERROR FATAL DEBUG
+enum LogLevel
+{
+    INFO,  // æ™®é€šä¿¡æ¯
+    ERROR, // é”™è¯¯ä¿¡æ¯
+    FATAL, // core dumpä¿¡æ¯
+    DEBUG, // è°ƒè¯•ä¿¡æ¯
+};
 
-// Êä³öÒ»¸öÈÕÖ¾Àà
+// è¾“å‡ºä¸€ä¸ªæ—¥å¿—ç±»
 
-    class Logger : NonCopyable
-    {
-    public:
-        // »ñÈ¡ÈÕÖ¾Î¨Ò»µÄÊµÀı¶ÔÏó µ¥Àı
-        static Logger &instance();
-        // ÉèÖÃÈÕÖ¾¼¶±ğ
-        void setLogLevel(int level);
-        // Ğ´ÈÕÖ¾
-        void log(std::string msg);
+class Logger : noncopyable
+{
+public:
+    // è·å–æ—¥å¿—å”¯ä¸€çš„å®ä¾‹å¯¹è±¡ å•ä¾‹
+    static Logger &instance();
+    // è®¾ç½®æ—¥å¿—çº§åˆ«
+    void setLogLevel(int level);
+    // å†™æ—¥å¿—
+    void log(std::string msg);
 
-    private:
-        int logLevel_;
-    };
-
-} // Vita
-
-#endif //VITANETLIB_LOGGER_H
+private:
+    int logLevel_;
+};

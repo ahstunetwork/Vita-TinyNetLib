@@ -1,27 +1,16 @@
-//
-// Created by vitanmc on 2023/3/5.
-//
+#pragma once
 
-#ifndef VITANETLIB_TIMESTAMP_H
-#define VITANETLIB_TIMESTAMP_H
-
-#include <unistd.h>
 #include <iostream>
+#include <string>
 
-namespace Vita {
+class Timestamp
+{
+public:
+    Timestamp();
+    explicit Timestamp(int64_t microSecondsSinceEpoch);
+    static Timestamp now();
+    std::string toString() const;
 
-    class Timestamp {
-    public:
-        explicit Timestamp();
-        explicit Timestamp(int64_t mSeconds);
-        static Timestamp now();
-        std::string to_string();
-
-    private:
-        int64_t mSeconds;
-    };
-
-
-} // Vita
-
-#endif //VITANETLIB_TIMESTAMP_H
+private:
+    int64_t microSecondsSinceEpoch_;
+};

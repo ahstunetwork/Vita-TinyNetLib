@@ -1,10 +1,4 @@
-//
-// Created by vitanmc on 2023/3/5.
-//
-
-#ifndef VITANETLIB_TCPCONNECTION_H
-#define VITANETLIB_TCPCONNECTION_H
-
+#pragma once
 
 #include <memory>
 #include <string>
@@ -16,114 +10,92 @@
 #include "Buffer.h"
 #include "Timestamp.h"
 
-namespace Vita {
-
-
-    class Channel;
-
-    class EventLoop;
-
-    class Socket;
+class Channel;
+class EventLoop;
+class Socket;
 
 /**
- * TcpServer => Acceptor => ÓĞÒ»¸öĞÂÓÃ»§Á¬½Ó£¬Í¨¹ıacceptº¯ÊıÄÃµ½connfd
- * => TcpConnectionÉèÖÃ»Øµ÷ => ÉèÖÃµ½Channel => Poller => Channel»Øµ÷
+ * TcpServer => Acceptor => æœ‰ä¸€ä¸ªæ–°ç”¨æˆ·è¿æ¥ï¼Œé€šè¿‡acceptå‡½æ•°æ‹¿åˆ°connfd
+ * => TcpConnectionè®¾ç½®å›è°ƒ => è®¾ç½®åˆ°Channel => Poller => Channelå›è°ƒ
  **/
 
-    class TcpConnection : NonCopyable, public std::enable_shared_from_this<TcpConnection> {
-    public:
-        TcpConnection(EventLoop *loop,
-                      const std::string &nameArg,
-                      int sockfd,
-                      const InetAddress &localAddr,
-                      const InetAddress &peerAddr);
+class TcpConnection : noncopyable, public std::enable_shared_from_this<TcpConnection>
+{
+public:
+    TcpConnection(EventLoop *loop,
+                  const std::string &nameArg,
+                  int sockfd,
+                  const InetAddress &localAddr,
+                  const InetAddress &peerAddr);
+    ~TcpConnection();
 
-        ~TcpConnection();
+    EventLoop *getLoop() const { return loop_; }
+    const std::string &name() const { return name_; }
+    const InetAddress &localAddress() const { return localAddr_; }
+    const InetAddress &peerAddress() const { return peerAddr_; }
 
-        EventLoop *getLoop() const { return loop_; }
+    bool connected() const { return state_ == kConnected; }
 
-        const std::string &name() const { return name_; }
+    // å‘é€æ•°æ®
+    void send(const std::string &buf);
+    // å…³é—­è¿æ¥
+    void shutdown();
 
-        const InetAddress &localAddress() const { return localAddr_; }
+    void setConnectionCallback(const ConnectionCallback &cb)
+    { connectionCallback_ = cb; }
+    void setMessageCallback(const MessageCallback &cb)
+    { messageCallback_ = cb; }
+    void setWriteCompleteCallback(const WriteCompleteCallback &cb)
+    { writeCompleteCallback_ = cb; }
+    void setCloseCallback(const CloseCallback &cb)
+    { closeCallback_ = cb; }
+    void setHighWaterMarkCallback(const HighWaterMarkCallback &cb, size_t highWaterMark)
+    { highWaterMarkCallback_ = cb; highWaterMark_ = highWaterMark; }
 
-        const InetAddress &peerAddress() const { return peerAddr_; }
+    // è¿æ¥å»ºç«‹
+    void connectEstablished();
+    // è¿æ¥é”€æ¯
+    void connectDestroyed();
 
-        bool connected() const { return state_ == kConnected; }
-
-        // ·¢ËÍÊı¾İ
-        void send(const std::string &buf);
-
-        // ¹Ø±ÕÁ¬½Ó
-        void shutdown();
-
-        void setConnectionCallback(const ConnectionCallback &cb) { connectionCallback_ = cb; }
-        void setMessageCallback(const MessageCallback &cb) { messageCallback_ = cb; }
-        void setWriteCompleteCallback(const WriteCompleteCallback &cb) { writeCompleteCallback_ = cb; }
-        void setCloseCallback(const CloseCallback &cb) { closeCallback_ = cb; }
-        void setHighWaterMarkCallback(const HighWaterMarkCallback &cb, size_t highWaterMark) {
-            highWaterMarkCallback_ = cb;
-            highWaterMark_ = highWaterMark;
-        }
-
-        // Á¬½Ó½¨Á¢
-        void connectEstablished();
-
-        // Á¬½ÓÏú»Ù
-        void connectDestroyed();
-
-    private:
-        enum StateE {
-            kDisconnected, // ÒÑ¾­¶Ï¿ªÁ¬½Ó
-            kConnecting,   // ÕıÔÚÁ¬½Ó
-            kConnected,    // ÒÑÁ¬½Ó
-            kDisconnecting // ÕıÔÚ¶Ï¿ªÁ¬½Ó
-        };
-
-        void setState(StateE state) { state_ = state; }
-
-
-        //ÕâËÄ¸öÊÇfdÉÏµÄ¸É»îÓÃµÄ»Øµ÷º¯Êı
-        void handleRead(Timestamp receiveTime);
-        void handleWrite();
-        void handleClose();
-        void handleError();
-
-        void sendInLoop(const void *data, size_t len);
-        void shutdownInLoop();
-
-        // ÕâÀïÊÇbaseloop»¹ÊÇsubloopÓÉTcpServerÖĞ´´½¨µÄÏß³ÌÊı¾ö¶¨
-        // ÈôÎª¶àReactor ¸Ãloop_Ö¸Ïòsubloop ÈôÎªµ¥Reactor ¸Ãloop_Ö¸Ïòbaseloop
-        EventLoop *loop_;
-        const std::string name_;
-        std::atomic_int state_;
-        bool reading_;
-
-        // Socket Channel ÕâÀïºÍAcceptorÀàËÆ
-        // Acceptor => mainloop
-        // TcpConnection => subloop
-        std::unique_ptr<Socket> socket_;
-        std::unique_ptr<Channel> channel_;
-
-        const InetAddress localAddr_;
-        const InetAddress peerAddr_;
-
-        // ÕâĞ©»Øµ÷TcpServerÒ²ÓĞ ÓÃ»§Í¨¹ıĞ´ÈëTcpServer×¢²á
-        // TcpServerÔÙ½«×¢²áµÄ»Øµ÷´«µİ¸øTcpConnection
-        // TcpConnectionÔÙ½«»Øµ÷×¢²áµ½ChannelÖĞ
-        // ÕâÒ»×é»Øµ÷º¯ÊıÊÇÓÃ»§Ì¬µÄ£¬Ç°ÃæÄÇÒ»×éHandleRead,HeadleWriteÄÚºËÌ¬µÄ
-        ConnectionCallback connectionCallback_;       // ÓĞĞÂÁ¬½ÓÊ±µÄ»Øµ÷
-        MessageCallback messageCallback_;             // ÓĞ¶ÁĞ´ÏûÏ¢Ê±µÄ»Øµ÷
-        WriteCompleteCallback writeCompleteCallback_; // ÏûÏ¢·¢ËÍÍê³ÉÒÔºóµÄ»Øµ÷
-        HighWaterMarkCallback highWaterMarkCallback_;
-        CloseCallback closeCallback_;
-        size_t highWaterMark_;
-
-        // Êı¾İ»º³åÇø
-        Buffer inputBuffer_;    // ½ÓÊÕÊı¾İµÄ»º³åÇø
-        Buffer outputBuffer_;   // ·¢ËÍÊı¾İµÄ»º³åÇø ÓÃ»§sendÏòoutputBuffer_·¢
+private:
+    enum StateE
+    {
+        kDisconnected, // å·²ç»æ–­å¼€è¿æ¥
+        kConnecting,   // æ­£åœ¨è¿æ¥
+        kConnected,    // å·²è¿æ¥
+        kDisconnecting // æ­£åœ¨æ–­å¼€è¿æ¥
     };
+    void setState(StateE state) { state_ = state; }
 
+    void handleRead(Timestamp receiveTime);
+    void handleWrite();
+    void handleClose();
+    void handleError();
 
-} // Vita
+    void sendInLoop(const void *data, size_t len);
+    void shutdownInLoop();
 
-#endif //VITANETLIB_TCPCONNECTION_H
+    EventLoop *loop_; // è¿™é‡Œæ˜¯baseloopè¿˜æ˜¯subloopç”±TcpServerä¸­åˆ›å»ºçš„çº¿ç¨‹æ•°å†³å®š è‹¥ä¸ºå¤šReactor è¯¥loop_æŒ‡å‘subloop è‹¥ä¸ºå•Reactor è¯¥loop_æŒ‡å‘baseloop
+    const std::string name_;
+    std::atomic_int state_;
+    bool reading_;
+
+    // Socket Channel è¿™é‡Œå’ŒAcceptorç±»ä¼¼    Acceptor => mainloop    TcpConnection => subloop
+    std::unique_ptr<Socket> socket_;
+    std::unique_ptr<Channel> channel_;
+
+    const InetAddress localAddr_;
+    const InetAddress peerAddr_;
+
+    // è¿™äº›å›è°ƒTcpServerä¹Ÿæœ‰ ç”¨æˆ·é€šè¿‡å†™å…¥TcpServeræ³¨å†Œ TcpServerå†å°†æ³¨å†Œçš„å›è°ƒä¼ é€’ç»™TcpConnection TcpConnectionå†å°†å›è°ƒæ³¨å†Œåˆ°Channelä¸­
+    ConnectionCallback connectionCallback_;       // æœ‰æ–°è¿æ¥æ—¶çš„å›è°ƒ
+    MessageCallback messageCallback_;             // æœ‰è¯»å†™æ¶ˆæ¯æ—¶çš„å›è°ƒ
+    WriteCompleteCallback writeCompleteCallback_; // æ¶ˆæ¯å‘é€å®Œæˆä»¥åçš„å›è°ƒ
+    HighWaterMarkCallback highWaterMarkCallback_;
+    CloseCallback closeCallback_;
+    size_t highWaterMark_;
+
+    // æ•°æ®ç¼“å†²åŒº
+    Buffer inputBuffer_;    // æ¥æ”¶æ•°æ®çš„ç¼“å†²åŒº
+    Buffer outputBuffer_;   // å‘é€æ•°æ®çš„ç¼“å†²åŒº ç”¨æˆ·sendå‘outputBuffer_å‘
+};

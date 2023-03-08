@@ -1,9 +1,4 @@
-//
-// Created by vitanmc on 2023/3/5.
-//
-
-#ifndef VITANETLIB_EVENTLOOP_H
-#define VITANETLIB_EVENTLOOP_H
+#pragma once
 
 #include <functional>
 #include <vector>
@@ -15,79 +10,61 @@
 #include "Timestamp.h"
 #include "CurrentThread.h"
 
-namespace Vita {
+class Channel;
+class Poller;
 
-    class Channel;
+// äº‹ä»¶å¾ªç¯ç±» ä¸»è¦åŒ…å«äº†ä¸¤ä¸ªå¤§æ¨¡å— Channel Poller(epollçš„æŠ½è±¡)
+class EventLoop : noncopyable
+{
+public:
+    using Functor = std::function<void()>;
 
-    class Poller;
+    EventLoop();
+    ~EventLoop();
 
-// ÊÂ¼şÑ­»·Àà Ö÷Òª°üº¬ÁËÁ½¸ö´óÄ£¿é Channel Poller(epollµÄ³éÏó)
-    class EventLoop : NonCopyable {
-    public:
-        using Functor = std::function<void()>;
+    // å¼€å¯äº‹ä»¶å¾ªç¯
+    void loop();
+    // é€€å‡ºäº‹ä»¶å¾ªç¯
+    void quit();
 
-        // Eventloop¹¹ÔìºÜ¼òµ¥£¬ÎŞĞèÈÎºÎ²ÎÊı£¬ÊÔÏë×Üloop
-        EventLoop();
-        ~EventLoop();
+    Timestamp pollReturnTime() const { pollRetureTime_; }
 
-        // ¿ªÆôÊÂ¼şÑ­»·
-        void loop();
+    // åœ¨å½“å‰loopä¸­æ‰§è¡Œ
+    void runInLoop(Functor cb);
+    // æŠŠä¸Šå±‚æ³¨å†Œçš„å›è°ƒå‡½æ•°cbæ”¾å…¥é˜Ÿåˆ—ä¸­ å”¤é†’loopæ‰€åœ¨çš„çº¿ç¨‹æ‰§è¡Œcb
+    void queueInLoop(Functor cb);
 
-        // ÍË³öÊÂ¼şÑ­»·
-        void quit();
+    // é€šè¿‡eventfdå”¤é†’loopæ‰€åœ¨çš„çº¿ç¨‹
+    void wakeup();
 
-        Timestamp pollReturnTime() const { pollRetureTime_; }
+    // EventLoopçš„æ–¹æ³• => Pollerçš„æ–¹æ³•
+    void updateChannel(Channel *channel);
+    void removeChannel(Channel *channel);
+    bool hasChannel(Channel *channel);
 
-        // ÔÚµ±Ç°loopÖĞÖ´ĞĞ
-        void runInLoop(Functor cb);
+    // åˆ¤æ–­EventLoopå¯¹è±¡æ˜¯å¦åœ¨è‡ªå·±çš„çº¿ç¨‹é‡Œ
+    bool isInLoopThread() const { return threadId_ == CurrentThread::tid(); } // threadId_ä¸ºEventLoopåˆ›å»ºæ—¶çš„çº¿ç¨‹id CurrentThread::tid()ä¸ºå½“å‰çº¿ç¨‹id
 
-        // °ÑÉÏ²ã×¢²áµÄ»Øµ÷º¯Êıcb·ÅÈë¶ÓÁĞÖĞ »½ĞÑloopËùÔÚµÄÏß³ÌÖ´ĞĞcb
-        void queueInLoop(Functor cb);
+private:
+    void handleRead();        // ç»™eventfdè¿”å›çš„æ–‡ä»¶æè¿°ç¬¦wakeupFd_ç»‘å®šçš„äº‹ä»¶å›è°ƒ å½“wakeup()æ—¶ å³æœ‰äº‹ä»¶å‘ç”Ÿæ—¶ è°ƒç”¨handleRead()è¯»wakeupFd_çš„8å­—èŠ‚ åŒæ—¶å”¤é†’é˜»å¡çš„epoll_wait
+    void doPendingFunctors(); // æ‰§è¡Œä¸Šå±‚å›è°ƒ
 
-        // Í¨¹ıeventfd»½ĞÑloopËùÔÚµÄÏß³Ì
-        void wakeup();
+    using ChannelList = std::vector<Channel *>;
 
-        // EventLoopµÄ·½·¨ => PollerµÄ·½·¨
-        // ¸øchannel´ò¹¤µÄº¯Êı
-        void updateChannel(Channel *channel);
-        void removeChannel(Channel *channel);
-        bool hasChannel(Channel *channel);
+    std::atomic_bool looping_; // åŸå­æ“ä½œ åº•å±‚é€šè¿‡CASå®ç°
+    std::atomic_bool quit_;    // æ ‡è¯†é€€å‡ºloopå¾ªç¯
 
-        // ÅĞ¶ÏEventLoop¶ÔÏóÊÇ·ñÔÚ×Ô¼ºµÄÏß³ÌÀï
-        bool isInLoopThread() const {
-            return threadId_ == CurrentThread::tid();
-        } // threadId_ÎªEventLoop´´½¨Ê±µÄÏß³Ìid CurrentThread::tid()Îªµ±Ç°Ïß³Ìid
+    const pid_t threadId_; // è®°å½•å½“å‰EventLoopæ˜¯è¢«å“ªä¸ªçº¿ç¨‹idåˆ›å»ºçš„ å³æ ‡è¯†äº†å½“å‰EventLoopçš„æ‰€å±çº¿ç¨‹id
 
-    private:
-        // ¸øeventfd·µ»ØµÄÎÄ¼şÃèÊö·ûwakeupFd_°ó¶¨µÄÊÂ¼ş»Øµ÷
-        // µ±wakeup()Ê± ¼´ÓĞÊÂ¼ş·¢ÉúÊ± µ÷ÓÃhandleRead()¶ÁwakeupFd_µÄ8×Ö½Ú Í¬Ê±»½ĞÑ×èÈûµÄepoll_wait
-        void handleRead();
-        void doPendingFunctors(); // Ö´ĞĞÉÏ²ã»Øµ÷
+    Timestamp pollRetureTime_; // Pollerè¿”å›å‘ç”Ÿäº‹ä»¶çš„Channelsçš„æ—¶é—´ç‚¹
+    std::unique_ptr<Poller> poller_;
 
+    int wakeupFd_; // ä½œç”¨ï¼šå½“mainLoopè·å–ä¸€ä¸ªæ–°ç”¨æˆ·çš„Channel éœ€é€šè¿‡è½®è¯¢ç®—æ³•é€‰æ‹©ä¸€ä¸ªsubLoop é€šè¿‡è¯¥æˆå‘˜å”¤é†’subLoopå¤„ç†Channel
+    std::unique_ptr<Channel> wakeupChannel_;
 
-        std::atomic_bool looping_; // Ô­×Ó²Ù×÷ µ×²ãÍ¨¹ıCASÊµÏÖ
-        std::atomic_bool quit_;    // ±êÊ¶ÍË³öloopÑ­»·
+    ChannelList activeChannels_; // è¿”å›Polleræ£€æµ‹åˆ°å½“å‰æœ‰äº‹ä»¶å‘ç”Ÿçš„æ‰€æœ‰Channelåˆ—è¡¨
 
-        const pid_t threadId_; // ¼ÇÂ¼µ±Ç°EventLoopÊÇ±»ÄÄ¸öÏß³Ìid´´½¨µÄ ¼´±êÊ¶ÁËµ±Ç°EventLoopµÄËùÊôÏß³Ìid
-
-        Timestamp pollRetureTime_; // Poller·µ»Ø·¢ÉúÊÂ¼şµÄChannelsµÄÊ±¼äµã
-        std::unique_ptr<Poller> poller_; // PollerĞèÒª×éºÏ½øEventLoopÀïÃæ
-
-        // ×÷ÓÃ£ºµ±mainLoop»ñÈ¡Ò»¸öĞÂÓÃ»§µÄChannel
-        // ĞèÍ¨¹ıÂÖÑ¯Ëã·¨Ñ¡ÔñÒ»¸ösubLoop Í¨¹ı¸Ã³ÉÔ±»½ĞÑsubLoop´¦ÀíChannel
-        int wakeupFd_;
-        std::unique_ptr<Channel> wakeupChannel_;
-
-        //¼ÇÂ¼Poller¼ì²âµ½µ±Ç°ÓĞÊÂ¼ş·¢ÉúµÄËùÓĞChannelÁĞ±í
-        //ÓÉpoller¸øËû´ò¹¤
-        using ChannelList = std::vector<Channel *>;
-        ChannelList activeChannels_;
-
-        std::atomic_bool callingPendingFunctors_; // ±êÊ¶µ±Ç°loopÊÇ·ñÓĞĞèÒªÖ´ĞĞµÄ»Øµ÷²Ù×÷
-        std::vector<Functor> pendingFunctors_;    // ´æ´¢loopĞèÒªÖ´ĞĞµÄËùÓĞ»Øµ÷²Ù×÷
-        std::mutex mutex_;                        // »¥³âËø ÓÃÀ´±£»¤ÉÏÃævectorÈİÆ÷µÄÏß³Ì°²È«²Ù×÷
-    };
-
-} // Vita
-
-#endif //VITANETLIB_EVENTLOOP_H
+    std::atomic_bool callingPendingFunctors_; // æ ‡è¯†å½“å‰loopæ˜¯å¦æœ‰éœ€è¦æ‰§è¡Œçš„å›è°ƒæ“ä½œ
+    std::vector<Functor> pendingFunctors_;    // å­˜å‚¨loopéœ€è¦æ‰§è¡Œçš„æ‰€æœ‰å›è°ƒæ“ä½œ
+    std::mutex mutex_;                        // äº’æ–¥é” ç”¨æ¥ä¿æŠ¤ä¸Šé¢vectorå®¹å™¨çš„çº¿ç¨‹å®‰å…¨æ“ä½œ
+};
