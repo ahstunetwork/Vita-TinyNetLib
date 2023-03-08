@@ -1,4 +1,4 @@
-# C++11 Muduo
+# C++11 网络库
 
 + 类设计UML图
 ![流程图](./img/class_uml.png)
@@ -32,6 +32,16 @@
 5. `TcpConnection`继承自`enable_shared_from_this`，`TcpConnection`对象可以调用`shared_from_this()`方法给其内部回调函数，相当于创建了一个带引用计数的`shared_ptr`，可参考链接 [link](https://blog.csdn.net/gc348342215/article/details/123215888)，同时`muduo`通过`tie()`方式解决了`TcpConnection`对象生命周期先于`Channel`结束的情况
 6. `muduo`采用`Reactor`模型和多线程结合的方式，实现了高并发非阻塞网络库
 
+## 扩展计划
+1. 后续会陆续补足网络库的健壮性
+2. 增加网络库基础设施，例如 HTTP Server
+3. 增加现代网络应用设计的基础组件，如 TimeQueue
+4. 增加自适应学习，对一段时间内的网络通信情况进行统计，动态调整
+5. 考虑优化子Reactor负载均衡算法
+
+## 测试
++ 例如编写一个 EchoServer，展示网络库运行情况
+![EchoServer](./img/netlib_running.png)
 
 
 持续更新..
